@@ -453,9 +453,11 @@ void led_indicate_boot_error() {
 	#else
 		while (true) {
 		    led_tx_on();
-		    led_rx_off();
+			if (pin_led_rx != pin_led_tx)
+				led_rx_off();
 		    delay(10);
-		    led_rx_on();
+			if (pin_led_rx != pin_led_tx)
+				led_rx_on();
 		    led_tx_off();
 		    delay(5);
 		}
@@ -785,7 +787,8 @@ void led_indicate_not_ready() {
                     led_rx_off();
                 #endif
             #else
-                led_rx_off();
+				if (pin_led_rx != pin_led_tx)
+					led_rx_off();
             #endif
         }
     }
