@@ -1,0 +1,42 @@
+name: Nightly Build
+on:
+  push:
+    branches: [rp2xxx-cleanup]
+jobs:
+  build:
+    runs-on: ubuntu-slim
+    steps:
+        - uses: actions/checkout@v4
+        - name: Essential deps
+          run: |
+              mkdir -p ~/local/bin
+              export PATH=$PATH:~/local/bin
+              export DEBIAN_FRONTEND=noninteractive && sudo apt update -y && sudo apt install build-essential ca-certificates python3 python3-pip python3-pyelftools git nodejs curl zip -y
+              curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=~/local/bin sh
+        - name: prep-rp2xxx
+          run: |
+              export PATH=$PATH:~/local/bin
+              make prep-rp2xxx
+        - name: Make artifact dir and set revision
+          run: |
+              mkdir -p artifacts
+              echo "GIT_SHORT_HASH=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+        - name: Build firmware-rp2040_lora
+          run: |
+              export BOARD=rp2040_lora
+              mkdir -p $BOARD
+              export PATH=$PATH:~/local/bin
+              make clean firmware-$BOARD
+              cp build/RNode_Firmware_CE.ino.uf2 $BOARD/RNode_CE_$BOARD\_$GIT_SHORT_HASH\.uf2
+              python3 rp2xxx_hash.py build | tail -n 1 > $BOARD/RNode_CE_$BOARD\_$GIT_SHORT_HASH\.uf2.sha256
+              zip -r artifacts/RNode_CE_$BOARD\.zip $BOARD
+              rm -rf $BOARD
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v7
+          with:
+            name: nightly-uf2
+            path: ./artifacts/*
+        - name: Update release
+          env:
+            GH_TOKEN: ${{ secrets.GH_PAT }}
+          run: gh release upload nightly-cleanup artifacts/* -R ${{github.repository}} --clobber
